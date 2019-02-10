@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cerrno>
+#include <memory>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
@@ -9,6 +10,8 @@
 using std::string;
 using std::cerr;
 using std::endl;
+using std::unique_ptr;
+using std::make_unique;
 
 
 FILE *log_stream;
@@ -178,21 +181,18 @@ bool CreateNewDirectory(const char *destination_directory) {
 }
 
 
-const char *JoinPath(const char *parent, const char *child) {
+unique_ptr<char[]> JoinPath(const char *parent, const char *child) {
     char file_sep[2] = {0};
     file_sep[0] = GetFileSeparator();
 
-    size_t full_path_len = strlen(parent) + strlen(file_sep) + strlen(child) + 1;
+    const size_t full_path_len = strlen(parent) + strlen(file_sep) + strlen(child) + 1;
+    auto new_path = make_unique<char[]>(full_path_len);
 
-    char *new_path = new char[full_path_len];
+    strcpy_s(new_path.get(), full_path_len, parent);
+    strcat_s(new_path.get(), full_path_len, file_sep);
+    strcat_s(new_path.get(), full_path_len, child);
 
-    strcpy_s(new_path, full_path_len, parent);
-    strcat_s(new_path, full_path_len, file_sep);
-    strcat_s(new_path, full_path_len, child);
-
-    const char *full_path = new_path;
-
-    return full_path;
+    return new_path;
 }
 
 
@@ -208,28 +208,25 @@ void BackupDirectoryTree(const char *source_directory, const char *destination_d
     while ((dp = readdir(dir)) != nullptr) {
         if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0) {
 
-            const char *source_path = JoinPath(source_directory, dp->d_name);
-            const char *dest_path = JoinPath(destination_directory, dp->d_name);
+            auto source_path = JoinPath(source_directory, dp->d_name);
+            auto dest_path = JoinPath(destination_directory, dp->d_name);
 
             if (!CreateNewDirectory(destination_directory))
                 break;
 
-            if (FileExists(source_path)) {
-                if (S_ISDIR(GetFileMode(source_path))) {
-                    BackupDirectoryTree(source_path, dest_path);
-                } else if (S_ISREG(GetFileMode(source_path))) {
-                    if (IsBackupRequired(source_path, dest_path)) {
-                        if (!CopyNewFile(source_path, dest_path)) {
-                            fprintf(log_stream, "FAILED to copy '%s' to '%s'\n", source_path, dest_path);
+            if (FileExists(source_path.get())) {
+                if (S_ISDIR(GetFileMode(source_path.get()))) {
+                    BackupDirectoryTree(source_path.get(), dest_path.get());
+                } else if (S_ISREG(GetFileMode(source_path.get()))) {
+                    if (IsBackupRequired(source_path.get(), dest_path.get())) {
+                        if (!CopyNewFile(source_path.get(), dest_path.get())) {
+                            fprintf(log_stream, "FAILED to copy '%s' to '%s'\n", source_path.get(), dest_path.get());
                         } else {
-                            fprintf(log_stream, "'%s' -> '%s'\n", source_path, dest_path);
+                            fprintf(log_stream, "'%s' -> '%s'\n", source_path.get(), dest_path.get());
                         }
                     }
                 }
             }
-
-            delete [] source_path;
-            delete [] dest_path;
         }
     }
 
