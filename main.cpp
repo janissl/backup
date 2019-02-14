@@ -165,14 +165,16 @@ bool CreateNewDirectory(const char *destination_directory) {
 
     try {
         if (!FileExists(destination_directory)) {
+#ifdef _WIN32_WINNT
+            auto err = mkdir(destination_directory);
+#else
             auto err = mkdir(destination_directory, S_IRWXU);
-
+#endif
             if (err != 0) {
                 fprintf(log_stream, "FAILED to create '%s' - %s\n", destination_directory, strerror(err));
                 throw;
             }
         }
-
     } catch (...) {
         success = false;
     }
