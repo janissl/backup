@@ -1,13 +1,13 @@
 #include <iostream>
 #include <cerrno>
 #include <memory>
+#include <cstring>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <utime.h>
 
-using std::string;
 using std::cerr;
 using std::endl;
 using std::unique_ptr;
@@ -44,7 +44,7 @@ const char *GetFileNameFromPath(const char *path) {
     char file_sep = GetFileSeparator();
     size_t last_sep_pos;
 
-    for (last_sep_pos = strlen(path) - 1; last_sep_pos >= 0; --last_sep_pos) {
+    for (last_sep_pos = std::strlen(path) - 1; last_sep_pos >= 0; --last_sep_pos) {
         if (path[last_sep_pos] == file_sep) {
             break;
         }
@@ -165,7 +165,7 @@ bool CreateNewDirectory(const char *destination_directory) {
 
     try {
         if (!FileExists(destination_directory)) {
-            errno_t err = mkdir(destination_directory);
+            auto err = mkdir(destination_directory, S_IRWXU);
 
             if (err != 0) {
                 fprintf(log_stream, "FAILED to create '%s' - %s\n", destination_directory, strerror(err));
@@ -185,12 +185,12 @@ unique_ptr<char[]> JoinPath(const char *parent, const char *child) {
     char file_sep[2] = {0};
     file_sep[0] = GetFileSeparator();
 
-    const size_t full_path_len = strlen(parent) + strlen(file_sep) + strlen(child) + 1;
+    const size_t full_path_len = std::strlen(parent) + std::strlen(file_sep) + std::strlen(child) + 1;
     auto new_path = make_unique<char[]>(full_path_len);
 
-    strcpy_s(new_path.get(), full_path_len, parent);
-    strcat_s(new_path.get(), full_path_len, file_sep);
-    strcat_s(new_path.get(), full_path_len, child);
+    std::strncpy(new_path.get(), parent, full_path_len);
+    std::strncat(new_path.get(), file_sep, full_path_len);
+    std::strncat(new_path.get(), child, full_path_len);
 
     return new_path;
 }
@@ -234,10 +234,12 @@ void BackupDirectoryTree(const char *source_directory, const char *destination_d
 }
 
 
-errno_t RunBackup(const char *source_root, const char *dest_root) {
-    errno_t err;
+int RunBackup(const char *source_root, const char *dest_root) {
+    int err = 0;
+    log_stream = fopen("last.log", "w");
 
-    if ((err = fopen_s(&log_stream, "last.log", "w")) != 0) {
+    if (!log_stream) {
+        err = errno;
         cerr << "Could not create the last.log file - " << strerror(err) << endl;
     } else {
         BackupDirectoryTree(source_root, dest_root);
@@ -255,7 +257,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    errno_t err = RunBackup(argv[1], argv[2]);
+    auto err = RunBackup(argv[1], argv[2]);
 
     return err;
 }
