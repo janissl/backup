@@ -66,7 +66,7 @@ time_t GetLastModificationTime(const char *path) {
 
         mod_time = buf.st_mtime;
     } catch (...) {
-        fprintf(log_stream, "Could not read the metadata of '%s'\n", path);
+        fprintf(log_stream, "Could not read the metadata of '%s' - %s\n", path, strerror(errno));
     }
 
     return mod_time;
@@ -85,7 +85,7 @@ mode_t GetFileMode(const char *path) {
 
         file_mode = buf.st_mode;
     } catch (...) {
-        fprintf(log_stream, "Could not read the metadata of '%s'\n", path);
+        fprintf(log_stream, "Could not read the metadata of '%s' - %s\n", path, strerror(errno));
     }
 
     return file_mode;
@@ -123,15 +123,15 @@ bool CopyNewFile(const char *source_path, const char *destination_path) {
         FILE *in = fopen(source_path, "rb");
 
         if (in == nullptr) {
-            fprintf(log_stream, "FAILED to open the file '%s' for reading\n", source_path);
+            fprintf(log_stream, "FAILED to open the file '%s' for reading - %s\n", source_path, strerror(errno));
             throw;
         }
 
         FILE *out = fopen(destination_path, "wb");
 
         if (out == nullptr) {
+            fprintf(log_stream, "FAILED to open the file '%s' for writing - %s\n", destination_path, strerror(errno));
             fclose(in);
-            fprintf(log_stream, "FAILED to open the file '%s' for writing\n", destination_path);
             throw;
         }
 
